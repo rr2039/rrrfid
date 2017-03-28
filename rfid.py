@@ -21,45 +21,20 @@ from Phidgets.Phidget import PhidgetLogLevel
 
 #Home path
 homepath ='/home/pi/Desktop/Sign-In Script/'
+audlib = homepath + 'aud/'
+logpath = homepath + 'log/'
 
-#Sound library path
-audlib=homepath + 'aud/'
 
-#Time Card log path
-logpath=homepath + 'log/'
-
-#Displayed Message file
-display='/var/www/html/message.txt'
-
-#Tag Assignment list file
-tags='/var/www/html/tag.txt'
-
+hiddenpath = '/var/www/html/'
+display= hiddenpath + 'message.txt'
+tags= hiddenpath + 'tag.txt'
 
  
-global name
 global tagsList
-#global tagStatus
-
 tagsList=list()
-#tagStatus=list()
-
-#Create an RFID object
-try:
-    rfid = RFID()
-except RuntimeError as e:
-    print("Runtime Exception: %s" % e.details)
-    print("Exiting....")
-    exit(1)
-     
-tagsList=list()
-#tagStatus=list()
-
 with open(tags) as f:
     tagsList = f.read().splitlines()
-                     
-#for index in range(len(tagsList)):
-#    tagStatus.append(0)
-         
+
 #Create an RFID object
 try:
     rfid = RFID()
@@ -67,24 +42,9 @@ except RuntimeError as e:
     print("Runtime Exception: %s" % e.details)
     print("Exiting....")
     exit(1)
-
-def actionOnAttach(e):
-    #TODO  performed once when device attached
-    time.sleep(5)
-    playSound('charge')
-
-def actionOnDetach(e):
-    #TODO  performed once when device detached
-    playSound('error')
-    time.sleep(3)
-    reboot()
-
-def actionOnOutputChange(e):
-    #TODO  performed once when terminal block output changes
-    print("Attached")
-
-def actionOnTagFound(e):
-    #TODO  performed once when tag is in range
+                     
+def login(name)
+    #TODO login by name
     t = e.tag
     if t == "Guest1":
         reboot()
@@ -135,20 +95,10 @@ def actionOnTagFound(e):
                 printToFile("/var/www/html/message.txt", "Welcome, " + name, True)
             else:
                 time_line= times[len(times)-1]
-                #time_idx= time_line.index(":")
-                #idx_start = time_idx-2
-                #idx_stop = time_idx+6
-                #timeIn = time_line[idx_start : idx_stop]
                 time_msg = "{}".format( now.strftime('%m/%d/%y,%H:%M:%S,'))
                 date_time = time_msg.split(",")
                 timeIn = time_ary[1]
                 timeOut = date_time[1]
-                #idx_start2 = time_msg.find(":")-3
-                #idx_stop2 = idx_start2+9
-                #timeOut = time_msg[idx_start2 : idx_stop2]
-                #print("")
-                #print("Time In: " + timeIn)
-                #print("Time Out: " + timeOut)
                 delta = getDelta(timeIn, timeOut)
                 print("Time logged: " + delta)
                 print(time_msg)
@@ -162,23 +112,92 @@ def actionOnTagFound(e):
     except ValueError:
         print("Error unknown tag %s" % (t))
 
+def logout(name)
+    #TODO logout by name
+    t = e.tag
+    if t == "Guest1":
+        reboot()
+    print(t)
+
+    try:
+        for idx in range(0,len(tagsList)):
+	    assignee=tagsList[idx].split('=')
+	    if assignee[0]==e.tag:
+	        name=assignee[1]
+		break
+	    else:
+		name='Guest_' + t
+        now = datetime.datetime.now()
+        time_card = logpath + name + '.log'
+        timeCardExists = os.path.isfile(time_card)
+        overwriteCard = not timeCardExists
+
+        printToLog(name, now)
+
+        if timeCardExists:
+            in_count=0
+            out_count=0
+            times= list()
+            with open(time_card) as ts:
+                line = ts.read()
+                in_count+=line.count("In")
+                out_count+=line.count("Out")
+                
+            with open(time_card) as ts:
+                times = ts.read().splitlines()
+            
+            time_line = times[len(times)-1]
+            time_ary = time_line.split(",")
+
+            print(times[len(times)-1])
+            print(times[len(times)-1].count(":"))
+
+            while(len(time_ary) < 5):
+                time_ary.append("")
+
+            for idx in range(0, 4):
+                print(time_ary[idx])
+            
+            if times[len(times)-1].count(":") >= 4:
+                time_msg = "\n{}".format( now.strftime('%m/%d/%y,%H:%M:%S,'))
+                printToFile(time_card, time_msg, False)
+                printToFile("/var/www/html/message.txt", "Welcome, " + name, True)
+            else:
+                time_line= times[len(times)-1]
+                time_msg = "{}".format( now.strftime('%m/%d/%y,%H:%M:%S,'))
+                date_time = time_msg.split(",")
+                timeIn = time_ary[1]
+                timeOut = date_time[1]
+                delta = getDelta(timeIn, timeOut)
+                print("Time logged: " + delta)
+                print(time_msg)
+                printToFile(time_card, time_msg + delta, False)
+                printToFile("/var/www/html/message.txt", "Goodbye, " + name + " (" + delta + ")", True)
+        else:
+            time_msg = "{}".format( now.strftime('%m/%d/%y,%H:%M:%S,'))
+            printToFile(time_card, time_msg, True)
+            printToFile("/var/www/html/message.txt", "Welcome, " + name, True)
+        playSound('ding')
+    except ValueError:
+        print("Error unknown tag %s" % (t))
+
+def getName(tag)
+    #TODO get name of student by tag
+
+
 def reboot():
     command = "/usr/bin/sudo /sbin/shutdown -r now"
     process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
     output = process.communicate()[0]
     print output
     
-       
+
 def playSound(snd_file):
     snd_file = audlib + snd_file + '.mp3'
     snd = subprocess.Popen(['omxplayer', '-o', 'hdmi', snd_file])
     time.sleep(1)
     snd.terminate()
     
-def actionOnTagLost(e):
-    #TODO  performed once when tag is out of range
-    time.sleep(1)
-
 def getDelta(in_time, out_time):
     t1 = in_time.split(":")
     t2 = out_time.split(":")
@@ -233,29 +252,14 @@ def printToFile(filename, text, overwrite):
     except ValueError:
         print("Error unknown tag %s" % (e.tag))
 
-#
-# Boilerplate formats and actions
-#
-         
-#Information Display Function
-def displayDeviceInfo():
-    print("|------------|----------------------------------|--------------|------------|")
-    print("|- Attached -|-              Type              -|- Serial No. -|-  Version -|")
-    print("|------------|----------------------------------|--------------|------------|")
-    print("|- %8s -|- %30s -|- %10d -|- %8d -|" % (rfid.isAttached(), rfid.getDeviceName(), rfid.getSerialNum(), rfid.getDeviceVersion()))
-    print("|------------|----------------------------------|--------------|------------|")
-    print("Number of outputs: %i -- Antenna Status: %s -- Onboard LED Status: %s" % (rfid.getOutputCount(), rfid.getAntennaOn(), rfid.getLEDOn()))
-         
-#Event Handler Callback Functions
 def rfidAttached(e):
-    attached = e.device
-    actionOnAttach(e)
-    print("RFID %i Attached!" % (attached.getSerialNum()))
+    time.sleep(5)
+    playSound('charge')
          
 def rfidDetached(e):
-    detached = e.device
-    actionOnDetach(e)
-    print("RFID %i Detached!" % (detached.getSerialNum()))
+    playSound('error')
+    time.sleep(3)
+    reboot()
          
 def rfidError(e):
     try:
@@ -265,22 +269,31 @@ def rfidError(e):
         print("Phidget Exception %i: %s" % (e.code, e.details))
          
 def rfidOutputChanged(e):
-    #source = e.device
-    #actionOnOutputChange(e)
-    #print("RFID %i: Output %i State: %s" % (source.getSerialNum(), e.index, e.state))
     print("")
     
 def rfidTagGained(e):
-    source = e.device
     rfid.setLEDOn(1)
-    actionOnTagFound(e)
-    
-         
-def rfidTagLost(e):
-    source = e.device
-    rfid.setLEDOn(0)
-    actionOnTagLost(e)
+    t = e.tag
+    if t == "Guest1":
+        reboot()
+    print(t)
 
+def tagIsCommand(tag):
+    flag = False
+   for idx in range(0,len(commandsList)):
+	    command = commandsList[idx].split('=')
+	    if command[0]==tag:
+	        flag = True
+	        break
+	now = datetime.datetime.now()
+        time_card = logpath + name + '.log'
+        timeCardExists = os.path.isfile(time_card)
+        overwriteCard = not timeCardExists
+
+
+def rfidTagLost(e):
+    rfid.setLEDOn(0)
+    time.sleep(1)
 
 def openDevice():
     try:
@@ -296,7 +309,6 @@ try:
     rfid.setOnAttachHandler(rfidAttached)
     rfid.setOnDetachHandler(rfidDetached)
     rfid.setOnErrorhandler(rfidError)
-    #rfid.setOnOutputChangeHandler(rfidOutputChanged)
     rfid.setOnTagHandler(rfidTagGained)
     rfid.setOnTagLostHandler(rfidTagLost)
 except PhidgetException as e:
@@ -304,11 +316,8 @@ except PhidgetException as e:
     print("Exiting....")
     exit(1)
          
-print("Opening phidget object....")
-openDevice()
-         
-print("Waiting for attach....")
 
+openDevice()
 try:
     rfid.waitForAttach(10000)
 except PhidgetException as e:
@@ -319,17 +328,8 @@ except PhidgetException as e:
         print("Phidget Exception %i: %s" % (e.code, e.details))
         print("Exiting....")
         exit(1)
-#else:
-#    displayDeviceInfo()
 
-print("Turning on the RFID antenna....")
-time.sleep(0.25)
-rfid.setAntennaOn(False)
-time.sleep(0.25)
 rfid.setAntennaOn(True)
-         
-print("Press Enter to quit....")
-         
 chr = sys.stdin.read(1)
                  
 try:
