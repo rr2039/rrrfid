@@ -38,123 +38,48 @@ tagsList=list()
 commandsList=list()
 
 with open(tags) as f:
-    tagsList = f.read().splitlines()
+	tagsList = f.read().splitlines()
 
 with open(commands) as f:
-    commandsList = f.read().splitlines()
+	commandsList = f.read().splitlines()
 
 #Create an RFID object
 try:
-    rfid = RFID()
+	rfid = RFID()
 except RuntimeError as e:
-    print("Runtime Exception: %s" % e.details)
-    reboot()
+	print("Runtime Exception: %s" % e.details)
+    	reboot()
                      
 def login(name)
-    #TODO login by name
-   now = datetime.datetime.now()
-   printToLog(name, now)
-   time_card = logpath + name + '.log'
-   
-    try:
-        timeCardExists = os.path.isfile(time_card)
-
-        if timeCardExists:              
-            with open(time_card) as ts:
-                times = ts.read().splitlines()
-            
-            time_line = times[len(times)-1]
-            time_ary = time_line.split(",")
-
-            print(times[len(times)-1])
-            print(times[len(times)-1].count(":"))
-
-            while(len(time_ary) < 5):
-                time_ary.append("")
-
-            for idx in range(0, 4):
-                print(time_ary[idx])
-            
-            if times[len(times)-1].count(":") >= 4:
-                time_msg = "\n{}".format( now.strftime('%m/%d/%y,%H:%M:%S,'))
-                printToFile(time_card, time_msg, False)
-                printToFile(display, "Welcome, " + name, True)
-            else:
-                time_line= times[len(times)-1]
-                time_msg = "{}".format( now.strftime('%m/%d/%y,%H:%M:%S,'))
-                date_time = time_msg.split(",")
-                timeIn = time_ary[1]
-                timeOut = date_time[1]
-                delta = getDelta(timeIn, timeOut)
-                print("Time logged: " + delta)
-                print(time_msg)
-                printToFile(time_card, time_msg + delta, False)
-                printToFile(display, "Goodbye, " + name + " (" + delta + ")", True)
-        else:
-            time_msg = "{}".format( now.strftime('%m/%d/%y,%H:%M:%S,'))
-            printToFile(time_card, time_msg, True)
-            printToFile(display, "Welcome, " + name, True)
-        playSound('ding')
-    except ValueError:
-        print("Error unknown tag %s" % (t))
+	#TODO login by name
+    	time_card = logpath + name + '.log'
+	timeCardExists = False
+	try:
+        	timeCardExists = os.path.isfile(time_card)             
+	except ValueError:
+        	print("Error")
 
 def logout(name)
-    #TODO logout by name
-  
-    try:
-        now = datetime.datetime.now()
+    	#TODO logout by name
+	now = datetime.datetime.now()
         time_card = logpath + name + '.log'
-        timeCardExists = os.path.isfile(time_card)
-        
+        timeCardExists = False
 	
-        printToLog(name, now)
-
-        if timeCardExists:
-            in_count=0
-            out_count=0
-            times= list()
-            with open(time_card) as ts:
-                line = ts.read()
-                in_count+=line.count("In")
-                out_count+=line.count("Out")
-                
-            with open(time_card) as ts:
-                times = ts.read().splitlines()
-            
-            time_line = times[len(times)-1]
-            time_ary = time_line.split(",")
-
-            print(times[len(times)-1])
-            print(times[len(times)-1].count(":"))
-
-            while(len(time_ary) < 5):
-                time_ary.append("")
-
-            for idx in range(0, 4):
-                print(time_ary[idx])
-            
-            if times[len(times)-1].count(":") >= 4:
-                time_msg = "\n{}".format( now.strftime('%m/%d/%y,%H:%M:%S,'))
-                printToFile(time_card, time_msg, False)
-                printToFile("/var/www/html/message.txt", "Welcome, " + name, True)
-            else:
-                time_line= times[len(times)-1]
-                time_msg = "{}".format( now.strftime('%m/%d/%y,%H:%M:%S,'))
-                date_time = time_msg.split(",")
-                timeIn = time_ary[1]
-                timeOut = date_time[1]
-                delta = getDelta(timeIn, timeOut)
-                print("Time logged: " + delta)
-                print(time_msg)
-                printToFile(time_card, time_msg + delta, False)
-                printToFile("/var/www/html/message.txt", "Goodbye, " + name + " (" + delta + ")", True)
-        else:
-            time_msg = "{}".format( now.strftime('%m/%d/%y,%H:%M:%S,'))
-            printToFile(time_card, time_msg, True)
-            printToFile(display, "Welcome, " + name, True)
-        playSound('ding')
-    except ValueError:
-        print("Error unknown tag %s" % (t))
+	try:
+        	timeCardExists = os.path.isfile(time_card)
+        except ValueError:
+		print("Error")
+	
+        time_line= times[len(times)-1]
+        time_msg = "{}".format( now.strftime('%m/%d/%y,%H:%M:%S,'))
+        date_time = time_msg.split(",")
+        timeIn = time_ary[1]
+        timeOut = date_time[1]
+        delta = getDelta(timeIn, timeOut)
+        print("Time logged: " + delta)
+        print(time_msg)
+        printToFile(time_card, time_msg + delta, False)
+        printToFile(display, "Goodbye, " + name + " (" + delta + ")", True)
 
 def getName(tag)
     #TODO get name of student by tag
@@ -254,11 +179,23 @@ def rfidOutputChanged(e):
     print("")
     
 def rfidTagGained(e):
-    rfid.setLEDOn(1)
-    t = e.tag
-    command_text = runCommand(t)
-    if command_text == "None":
-    	name = getName(t)
+	rfid.setLEDOn(1)
+    	t = e.tag
+    	command_text = runCommand(t)
+    	if command_text == "None":
+		name = getName(t)
+	now = datetime.datetime.now()
+    	printToLog(name, now)
+	if timeCardExists:              
+        	if time_line.count(":") >= 4:
+			login(name)
+		else:
+	        	logout(name)
+       	else:
+            		login(name)
+        
+		playSound('ding')
+	
 	
     
 def runCommand(tag):
