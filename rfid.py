@@ -104,6 +104,7 @@ def playSound(snd_file):
     snd_file = audlib + snd_file + '.mp3'
     snd = subprocess.Popen(['omxplayer', '-o', 'hdmi', snd_file])
     time.sleep(1)
+    snd.communicate('q')
     snd.terminate()
     
 def getDelta(in_time, out_time):
@@ -206,8 +207,11 @@ def runCommand(tag):
 	    flag = command[1]
 	    break
     
-    #TODO run command if not none
-    
+    try:
+	subprocess.call(flag)
+    except Exception as e:
+	print(e.code)
+	
     return flag
 
 def rfidTagLost(e):
